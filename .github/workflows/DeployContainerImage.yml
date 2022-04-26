@@ -1,0 +1,36 @@
+name: Deploy Docker Image into EKS
+
+on:
+  workflow_call:
+    inputs:
+      BUILD_NUMBER:
+        required: true
+        type: string
+      JOB_NAME:
+        required: true
+        type: string
+    secrets:
+      SHARED_JENKINS_URL:
+        required: true
+      SHARED_JENKINS_USER:
+        required: true
+      SHARED_JENKINS_TOKEN:
+        required: true
+
+jobs:
+  deploy-container:
+    runs-on: [self-hosted, general]
+
+    steps:
+      - name: Deploy to DEV
+        uses: toptal/jenkins-job-trigger-action@master
+        with:
+          jenkins_url: "${{ secrets.SHARED_JENKINS_URL }}"
+          jenkins_user: ${{ secrets.SHARED_JENKINS_USER }}
+          jenkins_token: ${{ secrets.SHARED_JENKINS_TOKEN }}
+          job_name: "${{ inputs.JOB_NAME }}"
+          job_params: |
+            {
+              "APP_VERSION": "${{ inputs.BUILD_NUMBER }}"
+            }
+          job_timeout: "300"
