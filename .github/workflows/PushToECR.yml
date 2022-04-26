@@ -23,7 +23,7 @@ on:
         required: true
 
 jobs:
-  ecr-push:
+  push-to-ecr:
     runs-on: [self-hosted, general]
 
     steps:
