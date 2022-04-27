@@ -21,6 +21,10 @@ on:
         required: true
       AWS_ROLE_ARN:
         required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
 
 jobs:
   push-to-ecr:
@@ -35,6 +39,19 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-duration-seconds: ${{ inputs.AWS_ROLE_DURATION }}
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull image
+        env:
+          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY_NAME }}
+          IMAGE_TAG: ${{ inputs.BUILD_NUMBER }}
+        run: |
+          docker pull docker.io/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Login to Amazon ECR
         id: login-ecr
