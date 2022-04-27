@@ -12,6 +12,9 @@ on:
       BUILD_NUMBER:
         required: true
         type: string
+      DOCKERHUB_ORG:
+        required: true
+        type: string
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -48,10 +51,11 @@ jobs:
 
       - name: Pull image
         env:
+          ORG: ${{ inputs.DOCKERHUB_ORG }}
           ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY_NAME }}
           IMAGE_TAG: ${{ inputs.BUILD_NUMBER }}
         run: |
-          docker pull docker.io/$ECR_REPOSITORY:$IMAGE_TAG
+          docker pull docker.io/$ORG/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Login to Amazon ECR
         id: login-ecr
