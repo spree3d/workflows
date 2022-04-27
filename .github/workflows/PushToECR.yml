@@ -48,3 +48,4 @@ jobs:
         run: |
           docker tag docker.io/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker rmi $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
