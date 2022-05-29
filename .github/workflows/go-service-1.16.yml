@@ -60,6 +60,13 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Log Start
+      run: pwd && ls && date +%s > start.txt && cat start.txt
+
+    - name: Display build vars
+      if: success()
+      run: make build-vars
+
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
@@ -99,7 +106,7 @@ jobs:
 
     - name: Report Card
       if: success()
-      run: make reportcard
+      run: rm -rf vendor && make reportcard
 
     - name: Docker Push
       if: github.ref == 'refs/heads/main' && success()
@@ -126,10 +133,14 @@ jobs:
       if: failure()
       run: make slack-buildfail
 
-    - name: Stop All Containers
-      if: success() || failure()
-      run: docker container stop `docker container ls -q` 2>/dev/null; true
-
     - name: Cleanup Containers
       if: success() || failure()
       run: make docker-clean
+
+    - name: Stop and Remove All Containers
+      if: success() || failure()
+      run: |
+        docker container stop `docker container ls -q` 2>/dev/null; true
+        docker container rm -f `docker container ls -aq` 2>/dev/null; true
+        docker volume rm `docker volume ls -qf dangling=true` 2>/dev/null; true
+        docker network rm `docker network ls -qf dangling=true` 2>/dev/null; true
