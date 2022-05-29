@@ -141,8 +141,8 @@ jobs:
         COMMIT_USERLINK=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
         START=$(cat start.txt)
         STOP=$(date +%s)
-        SECONDS=$(expr $(STOP) - $(START))
-        MINUTES=$(expr $(SECONDS) / 60)
+        SECONDS=$(expr ${STOP} - ${START})
+        MINUTES=$(expr ${SECONDS} / 60)
         curl -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
