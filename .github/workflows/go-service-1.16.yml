@@ -1,0 +1,135 @@
+name: Build, Test and Push Container
+
+on:
+  workflow_call:
+    inputs:
+      CODECOV_TOKEN:
+        required: false
+        type: string
+    secrets: inherit
+    outputs:
+      BUILD_NUMBER:
+        description: "the build number/tag of the successful run"
+        value: ${{ jobs.version.outputs.BUILD_NUMBER }}
+    env:
+      GOPROXY: http://goproxy/
+      GOPRIVATE: github.com/spree3d/*
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      SLACK_HOOK: ${{ secrets.SLACK_HOOK }}
+      CODECOV_TOKEN: ${{ inputs.CODECOV_TOKEN }}
+
+jobs:
+
+  version:
+    name: Determine Build Number
+    runs-on: [spree3d-shared-general]
+    if: success()
+    outputs:
+      BUILD_NUMBER: ${{ steps.gitversion.outputs.semVer }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.7
+        with:
+          versionSpec: '5.x'
+
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0.9.7
+        with:
+          useConfigFile: true
+
+  tests:
+    name: Test & Push Container
+    runs-on: spree3d-shared-general
+    needs: version
+    if: success()
+    env:
+      BUILD_NUMBER: ${{ needs.version.outputs.BUILD_NUMBER }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16.0
+
+    - name: Setup Git
+      if: success()
+      run: git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com"
+
+    - name: Build
+      if: success()
+      run: make build
+
+    - name: Run Tests
+      if: success()
+      run: make test
+
+    - name: Lint
+      if: success()
+      run: make lint
+
+    - name: Coverage
+      if: success()
+      run: make cover
+
+    - name: Login to Docker Hub
+      if: success()
+      run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+    - name: Docker Build
+      if: success()
+      run: make docker-build
+
+    - name: Run Integration Tests
+      if: success()
+      run: make compose-test
+
+    - name: Report Card
+      if: success()
+      run: make reportcard
+
+    - name: Docker Push
+      if: github.ref == 'refs/heads/main' && success()
+      run: make docker-push
+
+    - name: Create Tag
+      if: github.ref == 'refs/heads/main' && success()
+      uses: actions/github-script@v3
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          github.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: "refs/tags/v${{ env.BUILD_NUMBER }}",
+            sha: context.sha
+          })
+
+    - name: Notify Slack
+      if: success()
+      run: make slack-buildsuccess
+
+    - name: Notify Slack fail
+      if: failure()
+      run: make slack-buildfail
+
+    - name: Stop All Containers
+      if: success() || failure()
+      run: docker container stop `docker container ls -q` 2>/dev/null; true
+
+    - name: Cleanup Containers
+      if: success() || failure()
+      run: make docker-clean
