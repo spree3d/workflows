@@ -9,13 +9,6 @@ on:
       JOB_NAME:
         required: true
         type: string
-    secrets:
-      SHARED_JENKINS_URL:
-        required: true
-      SHARED_JENKINS_USER:
-        required: true
-      SHARED_JENKINS_TOKEN:
-        required: true
 
 jobs:
   deploy-container:
