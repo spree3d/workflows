@@ -6,7 +6,6 @@ on:
       CODECOV_TOKEN:
         required: false
         type: string
-    secrets: inherit
     outputs:
       BUILD_NUMBER:
         description: "the build number/tag of the successful run"
