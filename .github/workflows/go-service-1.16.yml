@@ -140,8 +140,8 @@ jobs:
     - name: Stop and Remove All Containers
       if: success() || failure()
       run: |
-        docker container stop `docker container ls -q` 2>/dev/null; true
-        docker container rm -f `docker container ls -aq` 2>/dev/null; true
-        docker volume rm `docker volume ls -qf dangling=true` 2>/dev/null; true
-        docker network rm `docker network ls -qf dangling=true` 2>/dev/null; true
+        docker container stop `docker container ls -q` 2>/dev/null || true
+        docker container rm -f `docker container ls -aq` 2>/dev/null || true
+        docker volume rm `docker volume ls -qf dangling=true` 2>/dev/null || true
+        docker network rm `docker network ls -qf dangling=true` 2>/dev/null || true
         exit 0
