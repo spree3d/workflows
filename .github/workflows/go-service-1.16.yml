@@ -63,12 +63,12 @@ jobs:
     - name: Log Start
       run: pwd && ls && date +%s > start.txt && cat start.txt
 
-    - name: Test Script
-      run: ./test.sh
-
     - name: Display build vars
       if: success()
       run: make build-vars
+
+    - name: Test Script
+      run: env
 
     - name: Setup Go
       uses: actions/setup-go@v2
