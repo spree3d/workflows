@@ -10,6 +10,9 @@ on:
       BUILD_NUMBER:
         description: "the build number/tag of the successful run"
         value: ${{ jobs.version.outputs.BUILD_NUMBER }}
+      DOCKER_IMAGE:
+        description: "the docker image pushed"
+        value: ${{ jobs.tests.outputs.DOCKER_IMAGE }}
 
 env:
   GOPROXY: http://goproxy/
@@ -51,6 +54,9 @@ jobs:
     runs-on: spree3d-shared-general
     needs: version
     if: success()
+    outputs:
+      DOCKER_IMAGE:
+        ${{ steps.docker-image-produced.outputs.DOCKER_IMAGE }}
     env:
       BUILD_NUMBER: ${{ needs.version.outputs.BUILD_NUMBER }}
 
@@ -65,10 +71,34 @@ jobs:
 
     - name: Display build vars
       if: success()
-      run: make build-vars
-
-    - name: Test Script
-      run: env
+      run: |
+        cat << EOF >> Makefile
+        .PHONY: display-build-vars
+        display-build-vars: ## Echo's build variables
+          @echo "VENDOR=\$(VENDOR)"
+          @echo "GROUP=\$(GROUP)"
+          @echo "SERVICE=\$(SERVICE)"
+          @echo "SERVICE_FRIENDLY=\$(SERVICE_FRIENDLY)"
+          @echo "SERVICE_DESCRIPTION=\$(SERVICE_DESCRIPTION)"
+          @echo "SERVICE_URL=\$(SERVICE_URL)"
+          @echo "BINARY_NAME=\$(BINARY_NAME)"
+          @echo "OUT_DIR=\$(OUT_DIR)"
+          @echo "DOCKER_REGISTRY=\$(DOCKER_REGISTRY)"
+          @echo "DOCKER_IMG=\$(DOCKER_IMG)"
+          @echo "DOCKER_TEST_IMG=\$(DOCKER_TEST_IMG)"
+          @echo "DOCKER_DB_IMG=\$(DOCKER_DB_IMG)"
+          @echo "DOCKER_CONTAINER_NAME=\$(DOCKER_CONTAINER_NAME)"
+          @echo "BUILD_USER=\$(BUILD_USER)"
+          @echo "BUILD_REPO=\$(BUILD_REPO)"
+          @echo "BUILD_NUMBER=\$(BUILD_NUMBER)"
+          @echo "BUILD_RUN=\$(GITHUB_RUN_NUMBER)"
+          @echo "BUILD_BRANCH=\$(BUILD_BRANCH)"
+          @echo "BUILD_HASH=\$(BUILD_HASH)"
+          @echo "BUILD_MESSAGE=\$(BUILD_MESSAGE)"
+          @echo "BUILD_DATE=\$(BUILD_DATE)"
+          @echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
+        EOF
+        make display-build-vars
 
     - name: Setup Go
       uses: actions/setup-go@v2
@@ -109,11 +139,26 @@ jobs:
 
     - name: Report Card
       if: success()
-      run: rm -rf vendor && make reportcard
+      run: |
+        if ! type "gometalinter" > /dev/null 2>&1; then
+            cd $(go env GOPATH); curl -L https://git.io/vp6lP | sh; cd -;
+        fi
+        if ! type "goreportcard-cli" > /dev/null 2>&1; then
+            go install github.com/gojp/goreportcard/cmd/goreportcard-cli;
+        fi
+        rm -rf vendor
+        goreportcard-cli > reportcard.txt && cat reportcard.txt
 
     - name: Docker Push
       if: github.ref == 'refs/heads/main' && success()
       run: make docker-push
+
+    - name: Set Docker Image Output
+      id: docker-image-produced
+      run: |
+        echo -e "docker-image-produced:\n\t-@echo \$(DOCKER_REGISTRY)/\$(DOCKER_IMG):\$(BUILD_NUMBER)" >> Makefile
+        IMG=$(make docker-image-produced)
+        echo "::set-output name=DOCKER_IMAGE::${IMG}"
 
     - name: Create Tag
       if: github.ref == 'refs/heads/main' && success()
@@ -132,7 +177,7 @@ jobs:
       if: success()
       run: |
         IFS=$'\n'
-        VARS=$(make build-vars 2> /dev/null)
+        VARS=$(make display-build-vars 2> /dev/null)
         for v in $VARS; do
             eval "${v/=/"=\""}\"";
         done
