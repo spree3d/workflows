@@ -143,6 +143,8 @@ jobs:
         STOP=$(date +%s)
         SECONDS=$(expr ${STOP} - ${START})
         MINUTES=$(expr ${SECONDS} / 60)
+        REPORTCARD=$(cat reportcard.txt)
+        REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
         curl -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
