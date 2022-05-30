@@ -72,31 +72,32 @@ jobs:
     - name: Display build vars
       if: success()
       run: |
+        TAB="$(printf '\t')"
         cat << EOF >> Makefile
 
         display-build-vars:
-            @echo "VENDOR=\$(VENDOR)"
-            @echo "GROUP=\$(GROUP)"
-            @echo "SERVICE=\$(SERVICE)"
-            @echo "SERVICE_FRIENDLY=\$(SERVICE_FRIENDLY)"
-            @echo "SERVICE_DESCRIPTION=\$(SERVICE_DESCRIPTION)"
-            @echo "SERVICE_URL=\$(SERVICE_URL)"
-            @echo "BINARY_NAME=\$(BINARY_NAME)"
-            @echo "OUT_DIR=\$(OUT_DIR)"
-            @echo "DOCKER_REGISTRY=\$(DOCKER_REGISTRY)"
-            @echo "DOCKER_IMG=\$(DOCKER_IMG)"
-            @echo "DOCKER_TEST_IMG=\$(DOCKER_TEST_IMG)"
-            @echo "DOCKER_DB_IMG=\$(DOCKER_DB_IMG)"
-            @echo "DOCKER_CONTAINER_NAME=\$(DOCKER_CONTAINER_NAME)"
-            @echo "BUILD_USER=\$(BUILD_USER)"
-            @echo "BUILD_REPO=\$(BUILD_REPO)"
-            @echo "BUILD_NUMBER=\$(BUILD_NUMBER)"
-            @echo "BUILD_RUN=\$(GITHUB_RUN_NUMBER)"
-            @echo "BUILD_BRANCH=\$(BUILD_BRANCH)"
-            @echo "BUILD_HASH=\$(BUILD_HASH)"
-            @echo "BUILD_MESSAGE=\$(BUILD_MESSAGE)"
-            @echo "BUILD_DATE=\$(BUILD_DATE)"
-            @echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
+        ${TAB}@echo "VENDOR=\$(VENDOR)"
+        ${TAB}@echo "GROUP=\$(GROUP)"
+        ${TAB}@echo "SERVICE=\$(SERVICE)"
+        ${TAB}@echo "SERVICE_FRIENDLY=\$(SERVICE_FRIENDLY)"
+        ${TAB}@echo "SERVICE_DESCRIPTION=\$(SERVICE_DESCRIPTION)"
+        ${TAB}@echo "SERVICE_URL=\$(SERVICE_URL)"
+        ${TAB}@echo "BINARY_NAME=\$(BINARY_NAME)"
+        ${TAB}@echo "OUT_DIR=\$(OUT_DIR)"
+        ${TAB}@echo "DOCKER_REGISTRY=\$(DOCKER_REGISTRY)"
+        ${TAB}@echo "DOCKER_IMG=\$(DOCKER_IMG)"
+        ${TAB}@echo "DOCKER_TEST_IMG=\$(DOCKER_TEST_IMG)"
+        ${TAB}@echo "DOCKER_DB_IMG=\$(DOCKER_DB_IMG)"
+        ${TAB}@echo "DOCKER_CONTAINER_NAME=\$(DOCKER_CONTAINER_NAME)"
+        ${TAB}@echo "BUILD_USER=\$(BUILD_USER)"
+        ${TAB}@echo "BUILD_REPO=\$(BUILD_REPO)"
+        ${TAB}@echo "BUILD_NUMBER=\$(BUILD_NUMBER)"
+        ${TAB}@echo "BUILD_RUN=\$(GITHUB_RUN_NUMBER)"
+        ${TAB}@echo "BUILD_BRANCH=\$(BUILD_BRANCH)"
+        ${TAB}@echo "BUILD_HASH=\$(BUILD_HASH)"
+        ${TAB}@echo "BUILD_MESSAGE=\$(BUILD_MESSAGE)"
+        ${TAB}@echo "BUILD_DATE=\$(BUILD_DATE)"
+        ${TAB}@echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
         EOF
         cat Makefile
         make display-build-vars
@@ -229,7 +230,7 @@ jobs:
       if: failure()
       run: |
         IFS=$'\n'
-        VARS=$(make build-vars 2> /dev/null)
+        VARS=$(make display-build-vars 2> /dev/null)
         for v in $VARS; do
             eval "${v/=/"=\""}\"";
         done
