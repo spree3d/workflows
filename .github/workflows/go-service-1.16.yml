@@ -73,8 +73,8 @@ jobs:
       if: success()
       run: |
         cat << EOF >> Makefile
-        .PHONY: display-build-vars
-        display-build-vars: ## Echo's build variables
+
+        display-build-vars:
           @echo "VENDOR=\$(VENDOR)"
           @echo "GROUP=\$(GROUP)"
           @echo "SERVICE=\$(SERVICE)"
@@ -98,6 +98,7 @@ jobs:
           @echo "BUILD_DATE=\$(BUILD_DATE)"
           @echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
         EOF
+        cat Makefile
         make display-build-vars
 
     - name: Setup Go
