@@ -99,7 +99,6 @@ jobs:
         ${TAB}@echo "BUILD_DATE=\$(BUILD_DATE)"
         ${TAB}@echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
         EOF
-        cat Makefile
         make display-build-vars
 
     - name: Setup Go
@@ -156,6 +155,7 @@ jobs:
       run: make docker-push
 
     - name: Set Docker Image Output
+      if: success()
       id: docker-image-produced
       run: |
         echo -e "docker-image-produced:\n\t-@echo \$(DOCKER_REGISTRY)/\$(DOCKER_IMG):\$(BUILD_NUMBER)" >> Makefile
@@ -183,16 +183,16 @@ jobs:
         for v in $VARS; do
             eval "${v/=/"=\""}\"";
         done
-        COMMIT_USERNAME=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
-        COMMIT_USERAVATAR=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
-        COMMIT_USERLINK=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
+        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
+        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
+        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
         START=$(cat start.txt)
         STOP=$(date +%s)
         SECONDS=$(expr ${STOP} - ${START})
         MINUTES=$(expr ${SECONDS} / 60)
         REPORTCARD=$(cat reportcard.txt)
         REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
-        curl -X POST ${SLACK_HOOK} \
+        curl -sS -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
                 "channel": "backend-engineering-builds",
@@ -234,10 +234,10 @@ jobs:
         for v in $VARS; do
             eval "${v/=/"=\""}\"";
         done
-        COMMIT_USERNAME=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
-        COMMIT_USERAVATAR=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
-        COMMIT_USERLINK=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
-        curl -X POST ${SLACK_HOOK} \
+        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
+        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
+        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
+        curl -sS -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
             "channel": "${SLACK_CHANNEL}",
