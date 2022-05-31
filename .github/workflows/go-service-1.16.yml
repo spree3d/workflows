@@ -240,7 +240,7 @@ jobs:
         curl -sS -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
-            "channel": "${SLACK_CHANNEL}",
+            "channel": "backend-engineering-builds",
             "username": "Github Actions - ${SERVICE_FRIENDLY}",
             "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
             "attachments": [{
