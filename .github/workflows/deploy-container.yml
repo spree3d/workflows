@@ -9,6 +9,8 @@ on:
       JOB_NAME:
         required: true
         type: string
+env:
+  SLACK_HOOK: ${{ secrets.SLACK_HOOK }}
 
 jobs:
   deploy-container:
@@ -27,3 +29,59 @@ jobs:
               "APP_VERSION": "${{ inputs.BUILD_NUMBER }}"
             }
           job_timeout: "300"
+
+      - name: Notify Slack
+        if: success()
+        run: |
+          curl -sS -X POST ${SLACK_HOOK} \
+          -d @- << EOF
+              {
+                  "channel": "backend-engineering-deploys",
+                  "username": "Github Actions",
+                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                  "attachments": [{
+                      "mrkdwn_in": ["text","value"],
+                      "color": "#36a64f",
+                      "pretext": "Image Deployed",
+                      "title": "${{ inputs.JOB_NAME }}",
+                      "text": "${{ inputs.JOB_NAME }} deployed",
+                      "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true},
+                          {
+                              "title": "Build Number",
+                              "value": "${{ inputs.BUILD_NUMBER }}",
+                              "short": true
+                          }],
+                      "thumb_url": "https://o.dlf.pt/dfpng/smallpng/279-2798236_gopher-docker-transparent-cartoons-docker-golang-hd-png.png",
+                      "footer": "spree3d ci",
+                      "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+                  }]
+              }
+          EOF
+
+      - name: Notify Slack fail
+        if: failure()
+        run: |
+          curl -sS -X POST ${SLACK_HOOK} \
+          -d @- << EOF
+              {
+                  "channel": "backend-engineering-deploys",
+                  "username": "Github Actions",
+                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                  "attachments": [{
+                      "mrkdwn_in": ["text","value"],
+                      "color": "#FF0000",
+                      "pretext": "Image Deploy Failed",
+                      "title": "${{ inputs.JOB_NAME }}",
+                      "text": "${{ inputs.JOB_NAME }} deploy failed",
+                      "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true},
+                          {
+                              "title": "Build Number",
+                              "value": "${{ inputs.BUILD_NUMBER }}",
+                              "short": true
+                          }],
+                      "thumb_url": "https://o.dlf.pt/dfpng/smallpng/279-2798236_gopher-docker-transparent-cartoons-docker-golang-hd-png.png",
+                      "footer": "spree3d ci",
+                      "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+                  }]
+              }
+          EOF
