@@ -13,7 +13,6 @@ on:
 jobs:
   push-to-ecr:
     runs-on: [self-hosted, general]
-
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1

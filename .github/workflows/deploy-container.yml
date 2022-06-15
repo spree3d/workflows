@@ -15,7 +15,7 @@ env:
 jobs:
   deploy-container:
     runs-on: [self-hosted, general]
-
+    if: success() && !contains(github.event.head_commit.message, 'nodeploy')
     steps:
       - name: Deploy to DEV
         uses: toptal/jenkins-job-trigger-action@master

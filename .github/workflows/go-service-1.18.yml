@@ -28,7 +28,7 @@ jobs:
   version:
     name: Determine Build Number
     runs-on: [spree3d-shared-general]
-    if: success()
+    if: success() && !contains(github.event.head_commit.message, 'nobuild')
     outputs:
       BUILD_NUMBER: ${{ steps.gitversion.outputs.semVer }}
 
@@ -53,7 +53,7 @@ jobs:
     name: Test & Push Container
     runs-on: spree3d-shared-general
     needs: version
-    if: success()
+    if: success() && !contains(github.event.head_commit.message, 'nobuild')
     outputs:
       DOCKER_IMAGE:
         ${{ steps.docker-image-produced.outputs.DOCKER_IMAGE }}
@@ -115,7 +115,7 @@ jobs:
       run: make build
 
     - name: Run Tests
-      if: success()
+      if: success() && !contains(github.event.head_commit.message, 'notest')
       run: make test
 
     - name: Lint
@@ -135,7 +135,7 @@ jobs:
       run: make docker-build
 
     - name: Run Integration Tests
-      if: success()
+      if: success() && !contains(github.event.head_commit.message, 'notest')
       run: make compose-test
 
     - name: Report Card
