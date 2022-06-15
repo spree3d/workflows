@@ -1,0 +1,275 @@
+name: Build, Test and Push Container
+
+on:
+  workflow_call:
+    inputs:
+      CODECOV_TOKEN:
+        required: false
+        type: string
+    outputs:
+      BUILD_NUMBER:
+        description: "the build number/tag of the successful run"
+        value: ${{ jobs.version.outputs.BUILD_NUMBER }}
+      DOCKER_IMAGE:
+        description: "the docker image pushed"
+        value: ${{ jobs.tests.outputs.DOCKER_IMAGE }}
+
+env:
+  GOPROXY: http://goproxy/
+  GOPRIVATE: github.com/spree3d/*
+  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  SLACK_HOOK: ${{ secrets.SLACK_HOOK }}
+  CODECOV_TOKEN: ${{ inputs.CODECOV_TOKEN }}
+
+jobs:
+
+  version:
+    name: Determine Build Number
+    runs-on: [spree3d-shared-general]
+    if: success()
+    outputs:
+      BUILD_NUMBER: ${{ steps.gitversion.outputs.semVer }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.7
+        with:
+          versionSpec: '5.x'
+
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0.9.7
+        with:
+          useConfigFile: true
+
+  tests:
+    name: Test & Push Container
+    runs-on: spree3d-shared-general
+    needs: version
+    if: success()
+    outputs:
+      DOCKER_IMAGE:
+        ${{ steps.docker-image-produced.outputs.DOCKER_IMAGE }}
+    env:
+      BUILD_NUMBER: ${{ needs.version.outputs.BUILD_NUMBER }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Log Start
+      run: pwd && ls && date +%s > start.txt && cat start.txt
+
+    - name: Display build vars
+      if: success()
+      run: |
+        TAB="$(printf '\t')"
+        cat << EOF >> Makefile
+
+        display-build-vars:
+        ${TAB}@echo "VENDOR=\$(VENDOR)"
+        ${TAB}@echo "GROUP=\$(GROUP)"
+        ${TAB}@echo "SERVICE=\$(SERVICE)"
+        ${TAB}@echo "SERVICE_FRIENDLY=\$(SERVICE_FRIENDLY)"
+        ${TAB}@echo "SERVICE_DESCRIPTION=\$(SERVICE_DESCRIPTION)"
+        ${TAB}@echo "SERVICE_URL=\$(SERVICE_URL)"
+        ${TAB}@echo "BINARY_NAME=\$(BINARY_NAME)"
+        ${TAB}@echo "OUT_DIR=\$(OUT_DIR)"
+        ${TAB}@echo "DOCKER_REGISTRY=\$(DOCKER_REGISTRY)"
+        ${TAB}@echo "DOCKER_IMG=\$(DOCKER_IMG)"
+        ${TAB}@echo "DOCKER_TEST_IMG=\$(DOCKER_TEST_IMG)"
+        ${TAB}@echo "DOCKER_DB_IMG=\$(DOCKER_DB_IMG)"
+        ${TAB}@echo "DOCKER_CONTAINER_NAME=\$(DOCKER_CONTAINER_NAME)"
+        ${TAB}@echo "BUILD_USER=\$(BUILD_USER)"
+        ${TAB}@echo "BUILD_REPO=\$(BUILD_REPO)"
+        ${TAB}@echo "BUILD_NUMBER=\$(BUILD_NUMBER)"
+        ${TAB}@echo "BUILD_RUN=\$(GITHUB_RUN_NUMBER)"
+        ${TAB}@echo "BUILD_BRANCH=\$(BUILD_BRANCH)"
+        ${TAB}@echo "BUILD_HASH=\$(BUILD_HASH)"
+        ${TAB}@echo "BUILD_MESSAGE=\$(BUILD_MESSAGE)"
+        ${TAB}@echo "BUILD_DATE=\$(BUILD_DATE)"
+        ${TAB}@echo "GITHUB_RUN_NUMBER=\$(GITHUB_RUN_NUMBER)"
+        EOF
+        make display-build-vars
+
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.18.0
+
+    - name: Setup Git
+      if: success()
+      run: git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com"
+
+    - name: Build
+      if: success()
+      run: make build
+
+    - name: Run Tests
+      if: success()
+      run: make test
+
+    - name: Lint
+      if: success()
+      run: make lint
+
+    - name: Coverage
+      if: success()
+      run: make cover
+
+    - name: Login to Docker Hub
+      if: success()
+      run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+    - name: Docker Build
+      if: success()
+      run: make docker-build
+
+    - name: Run Integration Tests
+      if: success()
+      run: make compose-test
+
+    - name: Report Card
+      if: success()
+      run: |
+        if ! type "gometalinter" > /dev/null 2>&1; then
+            cd $(go env GOPATH); curl -L https://git.io/vp6lP | sh; cd -;
+        fi
+        if ! type "goreportcard-cli" > /dev/null 2>&1; then
+            go install github.com/gojp/goreportcard/cmd/goreportcard-cli;
+        fi
+        rm -rf vendor
+        goreportcard-cli > reportcard.txt && cat reportcard.txt
+
+    - name: Docker Push
+      if: github.ref == 'refs/heads/main' && success()
+      run: make docker-push
+
+    - name: Set Docker Image Output
+      if: success()
+      id: docker-image-produced
+      run: |
+        echo -e "docker-image-produced:\n\t-@echo \$(DOCKER_REGISTRY)/\$(DOCKER_IMG):\$(BUILD_NUMBER)" >> Makefile
+        IMG=$(make docker-image-produced)
+        echo "::set-output name=DOCKER_IMAGE::${IMG}"
+
+    - name: Create Tag
+      if: github.ref == 'refs/heads/main' && success()
+      uses: actions/github-script@v3
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          github.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: "refs/tags/v${{ env.BUILD_NUMBER }}",
+            sha: context.sha
+          })
+
+    - name: Notify Slack
+      if: success()
+      run: |
+        IFS=$'\n'
+        VARS=$(make display-build-vars 2> /dev/null)
+        for v in $VARS; do
+            eval "${v/=/"=\""}\"";
+        done
+        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
+        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
+        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
+        START=$(cat start.txt)
+        STOP=$(date +%s)
+        SECONDS=$(expr ${STOP} - ${START})
+        MINUTES=$(expr ${SECONDS} / 60)
+        REPORTCARD=$(cat reportcard.txt)
+        REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
+        curl -sS -X POST ${SLACK_HOOK} \
+        -d @- << EOF
+            {
+                "channel": "backend-engineering-builds",
+                "username": "Github Actions - ${SERVICE_FRIENDLY}",
+                "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                "attachments": [{
+                    "mrkdwn_in": ["text","value"],
+                    "color": "#36a64f",
+                    "pretext": "New Image pushed to Docker Hub",
+                    "author_name": "${COMMIT_USERNAME}",
+                    "author_link": "${COMMIT_USERLINK}",
+                    "author_icon": "${COMMIT_USERAVATAR}",
+                    "title": "${SERVICE}",
+                    "title_link": "${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}",
+                    "text": "${BUILD_MESSAGE}\n\nTook ${MINUTES} minutes to build and test\n\nReport Card:\n\n${REPORTCARD}\n\n<${BUILD_REPO}/commit/${BUILD_HASH}|Github Commit> | <${BUILD_REPO})/actions/runs/${GITHUB_RUN_ID}|Github Action Run>",
+                    "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true},
+                        {
+                            "title": "Build Number",
+                            "value": "${BUILD_NUMBER}",
+                            "short": true
+                        },
+                        {
+                            "title": "Image",
+                            "value": "<https://hub.docker.com/repository/docker/${VENDOR}/${SERVICE}|${DOCKER_IMG}:${BUILD_NUMBER}>",
+                            "short": true
+                        }],
+                    "thumb_url": "https://o.dlf.pt/dfpng/smallpng/279-2798236_gopher-docker-transparent-cartoons-docker-golang-hd-png.png",
+                    "footer": "${VENDOR} ci",
+                    "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+                }]
+            }
+        EOF
+
+    - name: Notify Slack fail
+      if: failure()
+      run: |
+        IFS=$'\n'
+        VARS=$(make display-build-vars 2> /dev/null)
+        for v in $VARS; do
+            eval "${v/=/"=\""}\"";
+        done
+        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
+        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
+        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
+        curl -sS -X POST ${SLACK_HOOK} \
+        -d @- << EOF
+            {
+            "channel": "backend-engineering-builds",
+            "username": "Github Actions - ${SERVICE_FRIENDLY}",
+            "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+            "attachments": [{
+              "mrkdwn_in": ["text","value"],
+              "color": "#FF0000",
+              "pretext": "Build Failed",
+              "author_name": "${COMMIT_USERNAME}",
+              "author_link": "${COMMIT_USERLINK}",
+              "author_icon": "${COMMIT_USERAVATAR}",
+              "title": "${SERVICE}",
+              "title_link": "${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}",
+              "text": "${BUILD_MESSAGE}\n\n<${BUILD_REPO}/commit/${BUILD_HASH}|Github Commit> | <${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}|Github Action Run>",
+              "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true}],
+              "thumb_url": "https://i0.wp.com/sharetraveler.com/wp-content/uploads/2015/06/sad-face.jpg?ssl=1",
+              "footer": "${VENDOR} ci",
+              "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+            }]
+          }
+        EOF
+
+    - name: Cleanup Containers
+      if: success() || failure()
+      run: make docker-clean
+
+    - name: Stop and Remove All Containers
+      if: success() || failure()
+      run: |
+        docker container stop `docker container ls -q` 2>/dev/null || true
+        docker container rm -f `docker container ls -aq` 2>/dev/null || true
+        docker volume rm `docker volume ls -qf dangling=true` 2>/dev/null || true
+        docker network rm `docker network ls -qf dangling=true` 2>/dev/null || true
+        exit 0
