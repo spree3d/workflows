@@ -22,6 +22,9 @@ env:
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   SLACK_HOOK: ${{ secrets.SLACK_HOOK }}
   CODECOV_TOKEN: ${{ inputs.CODECOV_TOKEN }}
+  BUILDER_IMG: spree3d/base:golang-1.16.0-alpine
+  RUNTIME_IMG: spree3d/base:alpine-3.13.2
+  TESTING_IMG: spree3d/golang-testing:1.16.0-buster
 
 jobs:
 
