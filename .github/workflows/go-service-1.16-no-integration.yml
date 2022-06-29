@@ -185,12 +185,6 @@ jobs:
         COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login || true)
         COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url || true)
         COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url || true)
-        START=$(cat start.txt)
-        STOP=$(date +%s)
-        SECONDS=$(expr ${STOP} - ${START})
-        MINUTES=$(expr ${SECONDS} / 60)
-        REPORTCARD=$(cat reportcard.txt)
-        REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
         curl -sS -X POST ${SLACK_HOOK} \
         -d @- << EOF
             {
