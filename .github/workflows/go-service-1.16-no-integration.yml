@@ -191,7 +191,7 @@ jobs:
         MINUTES=$(expr ${SECONDS} / 60)
         REPORTCARD=$(cat reportcard.txt)
         REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
-        curl -sS -X POST ${SLACK_HOOK} \
+        curl -sS -X POST -o test.json ${SLACK_HOOK} \
         -d @- << EOF
             {
                 "channel": "backend-engineering-builds",
@@ -222,7 +222,7 @@ jobs:
                     "footer": "${VENDOR} ci",
                     "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
                 }]
-            } -o test.json
+            }
         EOF
 
     - name: Notify Slack fail
