@@ -182,15 +182,48 @@ jobs:
         for v in $VARS; do
             eval "${v/=/"=\""}\"";
         done
-        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login)
-        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url)
-        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
+        COMMIT_USERNAME=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.login || true)
+        COMMIT_USERAVATAR=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.avatar_url || true)
+        COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url || true)
         START=$(cat start.txt)
         STOP=$(date +%s)
         SECONDS=$(expr ${STOP} - ${START})
         MINUTES=$(expr ${SECONDS} / 60)
         REPORTCARD=$(cat reportcard.txt)
         REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
+        curl -sS -X POST ${SLACK_HOOK} \
+        -d @- << EOF
+            {
+                "channel": "backend-engineering-builds",
+                "username": "Github Actions - ${SERVICE_FRIENDLY}",
+                "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                "attachments": [{
+                    "mrkdwn_in": ["text","value"],
+                    "color": "#36a64f",
+                    "pretext": "New Image pushed to Docker Hub",
+                    "author_name": "${COMMIT_USERNAME}",
+                    "author_link": "${COMMIT_USERLINK}",
+                    "author_icon": "${COMMIT_USERAVATAR}",
+                    "title": "${SERVICE}",
+                    "title_link": "${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}",
+                    "text": "${BUILD_MESSAGE}\n\nTook ${MINUTES} minutes to build and test\n\nReport Card:\n\n${REPORTCARD}\n\n<${BUILD_REPO}/commit/${BUILD_HASH}|Github Commit> | <${BUILD_REPO})/actions/runs/${GITHUB_RUN_ID}|Github Action Run>",
+                    "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true},
+                        {
+                            "title": "Build Number",
+                            "value": "${BUILD_NUMBER}",
+                            "short": true
+                        },
+                        {
+                            "title": "Image",
+                            "value": "<https://hub.docker.com/repository/docker/${VENDOR}/${SERVICE}|${DOCKER_IMG}:${BUILD_NUMBER}>",
+                            "short": true
+                        }],
+                    "thumb_url": "https://o.dlf.pt/dfpng/smallpng/279-2798236_gopher-docker-transparent-cartoons-docker-golang-hd-png.png",
+                    "footer": "${VENDOR} ci",
+                    "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png"
+                }]
+            }
+        EOF
 
     - name: Notify Slack fail
       if: failure()
