@@ -187,8 +187,8 @@ jobs:
         COMMIT_USERLINK=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/${VENDOR}/${SERVICE}/commits/${BUILD_HASH} | jq -r .author.html_url)
         START=$(cat start.txt)
         STOP=$(date +%s)
-        SECONDS=$(expr ${STOP} - ${START} || true)
-        MINUTES=$(expr ${SECONDS} / 60 || true)
+        SECONDS=$(expr ${STOP} - ${START})
+        MINUTES=$(expr ${SECONDS} / 60)
         REPORTCARD=$(cat reportcard.txt)
         REPORTCARD=$(echo "${REPORTCARD//$'\n'/'\n'}")
         curl -sS -X POST ${SLACK_HOOK} \
@@ -206,7 +206,7 @@ jobs:
                     "author_icon": "${COMMIT_USERAVATAR}",
                     "title": "${SERVICE}",
                     "title_link": "${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}",
-                    "text": "${BUILD_MESSAGE}\n\nTook ${MINUTES} minutes to build and test\n\nReport Card:\n\n${REPORTCARD}\n\n<${BUILD_REPO}/commit/${BUILD_HASH}|Github Commit> | <${BUILD_REPO})/actions/runs/${GITHUB_RUN_ID}|Github Action Run>",
+                    "text": "${BUILD_MESSAGE}\n\nTook ${MINUTES} minutes to build and test\n\nReport Card:\n\n${REPORTCARD}\n\n<${BUILD_REPO}/commit/${BUILD_HASH}|Github Commit> | <${BUILD_REPO}/actions/runs/${GITHUB_RUN_ID}|Github Action Run>",
                     "fields": [{"title": " ","value": " ", "short": true },{"title": " ","value": " ","short": true},
                         {
                             "title": "Build Number",
