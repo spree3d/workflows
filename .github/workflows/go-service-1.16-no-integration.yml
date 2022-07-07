@@ -144,7 +144,7 @@ jobs:
             cd $(go env GOPATH); curl -L https://git.io/vp6lP | sh; cd -;
         fi
         if ! type "goreportcard-cli" > /dev/null 2>&1; then
-            go install github.com/gojp/goreportcard/cmd/goreportcard-cli;
+            go install github.com/gojp/goreportcard/cmd/goreportcard-cli@latest;
         fi
         rm -rf vendor
         goreportcard-cli > reportcard.txt && cat reportcard.txt
